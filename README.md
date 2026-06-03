@@ -58,27 +58,13 @@ The repository contains the following files and folders:
    ```
 
 ### Expected output
-Each runner script produces a figure matching the corresponding figure in the paper:
-- `Fig2_plots.m` → Figure 2
-- `Fig3_plots.m` → Figure 3
-- `Fig4_plots.m` → Figure 4
-- `Fig5_plots.m` → Figure 5
+Each runner script produces the subfigures matching the corresponding figures in the paper:
+- `Fig2_plots.m` → Figure 2 subfigures
+- `Fig3_plots.m` → Figure 3 subfigures
+- `Fig4_plots.m` → Figure 4 subfigures
+- `Fig5_plots.m` → Figure 5 subfigures
 
 ### Expected run time
 Each script is expected to complete in under **1 minute** on a normal desktop computer.
 
 ---
-
-## Instructions for Use
-
-### How to run the software on your own data
-1. Place your dataset in the `variables/` folder, formatted consistently with the existing data files.
-2. Open the relevant runner script in MATLAB and update the data-loading section at the top of the script to point to your data file.
-3. Press **Run** in the script submenu or execute the script from the MATLAB command window.
-
-### (Optional) Reproduction instructions
-To reproduce all quantitative results reported in the manuscript:
-1. Ensure the `variables/` folder contains the original provided dataset (do not modify these files).
-2. Run all four runner scripts in order: `Fig2_plots.m`, `Fig3_plots.m`, `Fig4_plots.m`, `Fig5_plots.m`.
-3. The output figures should match Figures 2–5 in the paper exactly.
-
