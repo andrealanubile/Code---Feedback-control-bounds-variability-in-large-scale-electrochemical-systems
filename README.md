@@ -1,22 +1,84 @@
-# Code---Feedback-control-bounds-variability-in-large-scale-electrochemical-systems
-This repository contains the code used in the paper 'Feedback control bounds variability in large scale electrochemical systems'
+# Code----Feedback-control-bounds-variability-in-large-scale-electrochemical-systems
 
-# System Requirements
-This code can run on any operating system that supports Matlab2024b (where this software has been developed) or newer versions
+This repository contains the code used in the paper **'Feedback control bounds variability in large scale electrochemical systems'**.
 
-# Installation guide
-Download the desired Matlab version and install according to Matworks official guidelines, https://www.mathworks.com/help/install/ug/install-products-with-internet-connection.html.
-The installation of the software can take up to 15 minutes.
+---
 
-# Demo
-The shared software contains 4 runners scripts that output the analysis on the shared dataset:
-- Fig2_plots.m plot the data information displayed in the second figure of the paper
-- Fig3_plots.m plot the data information displayed in the third figure of the paper
-- Fig4_plots.m plot the data information displayed in the fourth figure of the paper
-- Fig5_plots.m plot the data information displayed in the fifth figure of the paper
-- functions folder contains functions used by the main runners
-- variables folder contains processed data from the dataset used by the runner.
+## System Requirements
 
-# Instruction for use
-To run each of the runner you can open the file in Matlab and press 'Run' botton available in the script submenu
+### Software dependencies
+- **MATLAB 2024b** or newer (this is the version the software was developed and tested on)
+- No additional non-standard hardware is required
+
+### Supported operating systems
+This code can run on any operating system that supports MATLAB 2024b or newer, including:
+- Windows 10/11
+- macOS 12 (Monterey) or later
+- Linux (Ubuntu 20.04 or later)
+
+---
+
+## Installation Guide
+
+### Instructions
+1. Download MATLAB 2024b (or newer) from the MathWorks website.
+2. Install following the official MathWorks guidelines:
+   https://www.mathworks.com/help/install/ug/install-products-with-internet-connection.html
+3. Clone or download this repository and place it in a directory of your choice.
+4. No additional toolbox installation is required beyond a standard MATLAB installation.
+
+### Typical install time
+Installation of MATLAB can take up to **15 minutes** on a normal desktop computer. Downloading this repository takes less than 1 minute.
+
+---
+
+## Demo
+
+### Repository structure
+The repository contains the following files and folders:
+
+| File / Folder | Description |
+|---|---|
+| `Fig2_plots.m` | Runner script that generates Figure 2 from the paper |
+| `Fig3_plots.m` | Runner script that generates Figure 3 from the paper |
+| `Fig4_plots.m` | Runner script that generates Figure 4 from the paper |
+| `Fig5_plots.m` | Runner script that generates Figure 5 from the paper |
+| `functions/` | Folder containing helper functions used by the runner scripts |
+| `variables/` | Folder containing processed data from the dataset used by the runners |
+
+### Instructions to run on the demo dataset
+1. Open MATLAB 2024b or newer.
+2. Navigate to the repository folder in the MATLAB file browser or set it as your working directory:
+   ```matlab
+   cd('/path/to/repository')
+   ```
+3. Open any of the runner scripts (e.g., `Fig2_plots.m`) and press the **Run** button in the script submenu, or type the script name in the MATLAB command window:
+   ```matlab
+   Fig2_plots
+   ```
+
+### Expected output
+Each runner script produces a figure matching the corresponding figure in the paper:
+- `Fig2_plots.m` → Figure 2
+- `Fig3_plots.m` → Figure 3
+- `Fig4_plots.m` → Figure 4
+- `Fig5_plots.m` → Figure 5
+
+### Expected run time
+Each script is expected to complete in under **1 minute** on a normal desktop computer.
+
+---
+
+## Instructions for Use
+
+### How to run the software on your own data
+1. Place your dataset in the `variables/` folder, formatted consistently with the existing data files.
+2. Open the relevant runner script in MATLAB and update the data-loading section at the top of the script to point to your data file.
+3. Press **Run** in the script submenu or execute the script from the MATLAB command window.
+
+### (Optional) Reproduction instructions
+To reproduce all quantitative results reported in the manuscript:
+1. Ensure the `variables/` folder contains the original provided dataset (do not modify these files).
+2. Run all four runner scripts in order: `Fig2_plots.m`, `Fig3_plots.m`, `Fig4_plots.m`, `Fig5_plots.m`.
+3. The output figures should match Figures 2–5 in the paper exactly.
 
