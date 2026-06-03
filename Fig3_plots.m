@@ -1,189 +1,178 @@
-%% Impedance Plot with Temperature-Based and Blue-Colored Curves %%
+%% ==================== SETUP ====================
+clear; clc; close all;
 
-clear; clc; close all
-set(0,'DefaultFigureWindowStyle','normal');
-
-%% Setup and Paths
+% Paths / utils
 addpath('functions')
 addpath('variables')
 set_plot_defaults_constant_font(16);
 
-load("CapacityPartial.mat")
+load("History_DeltaOCV_new_v2026.mat");
+load("CapacityPartial.mat");
+load("DataAugmentation_new_v2026.mat");
+load("Temperature_Collection.mat");
 
-% Recombine
-LogData = struct([]);
-Log_v   = [];
-for k = 1:20
-    fname = sprintf('variables/LogData_selected_%02d.mat', k);
-    tmp   = load(fname);  % loads LogData_part, Log_v_part
-    LogData = [LogData, tmp.LogData_part];
-    Log_v   = [Log_v,   tmp.Log_v_part];
-end
+% Trim first entries as in your original script
+Day_beg(1) = []; 
+Day_end(1) = [];
 
-%% Some settings
-plot_single_cell = 1;
-set_plot_mileage = 0;
-font_size = 16;
+%% ==================== STATS ====================
+[DeltaSOC_mean, ~, ~] = computeDeltaSOCStats(DeltaSOC_LC, corr_value, Day_end);
 
-Capacity_Vector = 220:240;
-delta_ind       = round(length(winter)/ length(Capacity_Vector));
-hot_colors      = flipud(winter);
-colors_p        = hot_colors(1:delta_ind:length(winter),:);
+valid_indices = find( ...
+    (mean(SOC_beg,2) >= 55 | mean(SOC_beg,2) <= 20) & ...
+    (mean(SOC_end,2) >= 55 | mean(SOC_end,2) <= 20) & ...
+    DeltaSOC_mean' >= 25 & Rest_beg' >= minutes(13) & Rest_end' >=minutes(13));
 
-%% Generate Color Maps
-T_min = 10;
-T_max = 35;
+Date = datetime("1-May-2024");
+valid_indices_1 = find( ...
+    (mean(SOC_beg,2) >= 55 | mean(SOC_beg,2) <= 20) & ...
+    (mean(SOC_end,2) >= 55 | mean(SOC_end,2) <= 20) & ...
+    DeltaSOC_mean' >= 25 & (Day_end<Date)' & Rest_beg' >= minutes(5) & Rest_end' >=minutes(5)');
+% valid_indices = find( ...
+%     (mean(SOC_beg,2) >= 55 | mean(SOC_beg,2) <= 20) & ...
+%     (mean(SOC_end,2) >= 55 | mean(SOC_end,2) <= 20) & ...
+%     DeltaSOC_mean' >= 25 & (Day_end>Date)');
 
-N = length(Log_v);
-green_pastel    = [0.40 0.75 0.55];
-lavender_pastel = [0.70 0.65 0.90];
-indigo_pastel   = [0.35 0.25 0.65];
+color_info_raw_matrix     = computeColorInfoMatrix(DeltaSOC_LC, DeltaSOC_mean, valid_indices);
+[normalized_HI, ref_row]  = normalizeColorInfo(color_info_raw_matrix); %#ok<NASGU>
+mean_HI                   = mean(color_info_raw_matrix, 1);            %#ok<NASGU>
+std_HI                    = std(color_info_raw_matrix, 0, 1);          %#ok<NASGU>
+std_HI_norm               = std(normalized_HI, 0, 1);                  %#ok<NASGU>
 
-colors = interp1([0 0.5 1], ...
-               [green_pastel; lavender_pastel; indigo_pastel], ...
-               linspace(0,1,N));
+color_info_raw_matrix_1     = computeColorInfoMatrix(DeltaSOC_LC, DeltaSOC_mean, valid_indices_1);
+[normalized_HI_1, ref_row_1]  = normalizeColorInfo(color_info_raw_matrix_1); %#ok<NASGU>
+mean_HI_1                   = mean(color_info_raw_matrix_1, 1);            %#ok<NASGU>
+std_HI_1                    = std(color_info_raw_matrix_1, 0, 1);          %#ok<NASGU>
+std_HI_norm_1               = std(normalized_HI_1, 0, 1);                  %#ok<NASGU>
 
-%% Initialization
-Impedance_inter = {};
-Energies = [];
-Mileage  = [];
-Temp     = [];
-t_str      = strings(length(Log_v), 1);
-t_datetime = NaT(length(Log_v), 1);
-voltage_interp = 3.75:0.001:3.84;
-d1 = designfilt("lowpassiir", FilterOrder=5, HalfPowerFrequency=0.0002, DesignMethod="butter");
+%% ==================== GLOBAL PLOT CONTROLS ====================
+idx_to_plot   = [36, 29287];
+idx_to_plot   = [valid_indices(1), valid_indices(end)];
+lower_limit   = -1.5;
+upper_limit   =  1.5;
 
-%% Figures
-f1 = figure(1); hold on;
-xlabel('Voltage [V]'); ylabel('1/Z_1 [k\Omega^{-1}]');
-colormap(figure(1), colors); cb1 = colorbar;
-xlim([3.5,4.15]); ylim([0,20]);
+% Colormap helpers
+make_pastel = @(cmap, f) min(1, cmap + (1 - cmap) * f);
+pastel_factor_hi   = 0.25;
+pastel_factor_temp = 0.25;
+N = 256;
 
-f2 = figure(2); hold on;
-xlabel('Voltage [V]'); ylabel('1/Z_108 [k\Omega^{-1}]');
-colormap(figure(2), colors); cb1 = colorbar;
-xlim([3.5,4.15]); ylim([0,20]);
+% ---- HI colormap: Blue → (short) Grey → Red ----
+grey_frac   = 0.05;                               % SHORT grey band (10% of scale)
+base_cmap   = build_blue_grey_red(N, grey_frac);  % custom builder below
+base_cmap   = flipud(base_cmap);                  % match your original visual direction
+custom_cmap = make_pastel(base_cmap, pastel_factor_hi);
+[cm, nColors] = prep_colormap_for_limits(custom_cmap, lower_limit, upper_limit, N);
 
-f3 = figure(3); hold on;
-xlabel('Voltage [V]'); ylabel('1/Z [\Omega^{-1}]');
-colormap(figure(3), colors); cb1 = colorbar;
+% ---- Temperature colormap: mostly same, slightly darker at the very top ----
+t = linspace(0,1,N)'; 
 
-%% Main Loop
+% Start near yellow [1,1,0] at bottom, fade to red [1,0,0]
+low_yellow = [1 1 0];
+high_red   = [1 0 0];
 
-for h = 1:N
+orange_red = [ ...
+    ones(N,1), ...                          % R always 1
+    (1 - t).*low_yellow(2) + t.*high_red(2), ... % G fades 1 → 0
+    (1 - t).*low_yellow(3) + t.*high_red(3)];    % B fades 0 → 0 (stays 0)
 
-    Impedence = LogData(h).data;   % <-- replaces load(fullfile(...))
+% Darken only the very top 15%
+darkening        = ones(N,1);
+top_mask         = (t >= 0.85);
+darkening(top_mask) = linspace(1, 0.85, sum(top_mask))';
+orange_red       = orange_red .* darkening;
 
-    t_str(h)      = Impedence.DateTime;
-    t_datetime(h) = datetime(Impedence.DateTime, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss');
+cmap_temp_pastel = make_pastel(orange_red, pastel_factor_temp);
 
-    c_blue = colors(h,:);
-
-    Z_fil      = filtfilt(d1, Impedence.Z_chg_LC(:,1));
-    Z_fil_pack = filtfilt(d1, Impedence.Z_chg);
+%% ==================== PLOTS ====================
+% --- Per-event distributions / profiles ---
+for ii = 1:numel(idx_to_plot)
+    ev_idx   = idx_to_plot(ii);
+    DeltaSOC = DeltaSOC_LC(ev_idx, :);
+    mu       = mean(DeltaSOC);
+    vec      = (mu - DeltaSOC) ./ max(DeltaSOC, eps) * 100; % robust to zero
     
-    if h ~=84
-        figure(1)
-        plot(Impedence.V_chg_LC(10000:end,1), 1./Z_fil(10000:end)/1000, 'Color', c_blue)
-    end 
-
-    if h ~=84
-        figure(2)
-        Z_fil = filtfilt(d1, Impedence.Z_chg_LC(:,2));
-        plot(Impedence.V_chg_LC(10000:end,1), 1./Z_fil(10000:end)/1000, 'Color', c_blue)
-    end
-
-    if h ~=84
-        figure(3)
-        plot(Impedence.V_chg(10000:end), 1./Z_fil_pack(10000:end)/1000, 'Color', c_blue)
-    end
-    
-    Impedance_inter_tmp = zeros(length(voltage_interp), 108);
-
-    indx = Impedence.V_chg_LC(:,1) >= 3.75 & Impedence.V_chg_LC(:,1) <= 3.84;
+    % Distribution (colored by HI)
+    plot_event_distribution(vec, ev_idx, lower_limit, upper_limit, cm, nColors);
+    colormap(custom_cmap); caxis([lower_limit upper_limit]); colorbar;
 
 end
 
-%% Colorbar date labels
-tick_indices     = round(linspace(1, N, 5));
-str_date         = datestr(t_datetime(tick_indices));
-str_date         = str_date(:,1:11);
-str_date_combined = [str_date(:,4:6), str_date(:,3), str_date(:,10:11)];
+% --- IQR sticks (colored by HI) ---
+M_pct    = color_info_raw_matrix * 100;
+lower_p  = 25;
+higher_p = 75;
 
-figure(1); cb1 = colorbar; cb1.Ticks = linspace(0,1,5);
-cb1.TickLabels = cellstr(str_date_combined); grid off
-figure(2); cb1 = colorbar; cb1.Ticks = linspace(0,1,5);
-cb1.TickLabels = cellstr(str_date_combined); grid off
-figure(3); cb1 = colorbar; cb1.Ticks = linspace(0,1,5);
-cb1.TickLabels = cellstr(str_date_combined); grid off
+% For the first half
+M_pct_1    = color_info_raw_matrix_1 * 100;
+lower_p  = 25; 
+higher_p = 75;
 
-lock_fonts(f1,font_size,font_size,font_size,font_size)
-lock_fonts(f2,font_size,font_size,font_size,font_size)
-lock_fonts(f3,font_size,font_size,font_size,font_size)
+plot_iqr_sticks_colored(M_pct, lower_limit, upper_limit, cm, custom_cmap, lower_p, higher_p);
+colormap(custom_cmap); caxis([lower_limit upper_limit]); colorbar;
 
-%% Load Processed Data
-load("Impedance_Interpolated.mat")
+% --- Capacity vs median(HI) ---
+% First Lab test vs First portion of data
+p50_1 = prctile(M_pct_1, 50, 1);
+plot_capacity_vs_median(Capacity_partial,      p50_1, custom_cmap, -1, 1);
+corrcoef((Capacity_partial-mean(Capacity_partial))./Capacity_partial,p50_1)
 
-%% Extract statistics
-N = length(Impedance_inter);
+load('CapacityPartial_2.mat')
+p50 = prctile(M_pct, 50, 1);
+plot_capacity_vs_median(Capacity_partial_C3,   p50, custom_cmap, -1, 1);
+corrcoef((Capacity_partial_C3-mean(Capacity_partial_C3))./Capacity_partial_C3,p50)
 
-features.beg_v = []; features.end_v = [];
-features.beg_v_rel = []; features.end_v_rel = [];
-features.peak_val = []; features.idx_peak = [];
 
-for i = 1:N
-    features.beg_v(i,:) = Impedance_inter{i}(1,:);
-    features.end_v(i,:) = Impedance_inter{i}(end,:);
-    features.beg_v_rel(i,:) = (Impedance_inter{i}(1,:)-Impedance_inter{1}(1,:))./Impedance_inter{1}(1,:);
-    features.end_v_rel(i,:) = (Impedance_inter{i}(end,:)-Impedance_inter{1}(end,:))./Impedance_inter{1}(end,:);
-    for cell_idx = 1:108
-        [features.peak_val(i,cell_idx), features.idx_peak(i,cell_idx)] = max(Impedance_inter{i}(:,cell_idx));
-    end
+%% ==================== Temperature-colored plots ====================
+T_collection    = [T_collection_driving, T_collection_charging];
+T_mean_per_cell = mean(T_collection_driving, 2, 'omitnan');
+T_median_per_cell = median(T_collection_driving, 2, 'omitnan');
+T_std_per_cell  = std(T_collection_driving, 0, 2, 'omitnan');
+
+num_cells = size(M_pct,2);
+assert(numel(T_mean_per_cell)==num_cells && numel(T_std_per_cell)==num_cells, ...
+    'Temperature vectors must have length == number of cells.');
+
+% Color limits
+clim_mean = [min(T_median_per_cell) max(T_median_per_cell)];
+clim_std  = [min(T_std_per_cell)  max(T_std_per_cell)];
+
+% Percentiles to show
+p_low  = lower_p;
+p_high = higher_p;
+
+plot_temperature_row_percentiles(T_collection_driving, p_low, p_high)
+
+plot_Hid_vs_t_median(p50,  T_median_per_cell, cmap_temp_pastel, 19, 21);
+corrcoef(p50,  T_mean_per_cell)
+
+
+
+%% ==================== HELPERS ====================
+function cmap = build_blue_grey_red(n, grey_frac)
+%BUILD_BLUE_GREY_RED  Blue → Grey → Red with adjustable grey width (short band).
+%   n         : number of colors (e.g., 256)
+%   grey_frac : fraction of the scale used for grey (e.g., 0.05–0.15)
+
+    % Clamp and split
+    grey_frac = max(0, min(0.4, grey_frac));
+    frac_blue = (1 - grey_frac)/2;
+    frac_red  = frac_blue;
+
+    nB = max(1, round(n*frac_blue));
+    nG = max(1, round(n*grey_frac));
+    nR = max(1, n - nB - nG);
+
+    blue = [0 0 1];
+    grey = [0.85 0.85 0.85];
+    red  = [1 0 0];
+
+    % Blue → Grey (ramp)
+    part1 = [linspace(blue(1),grey(1),nB)', linspace(blue(2),grey(2),nB)', linspace(blue(3),grey(3),nB)'];
+    % Flat Grey band (short)
+    part2 = repmat(grey, nG, 1);
+    % Grey → Red (ramp)
+    part3 = [linspace(grey(1),red(1),nR)', linspace(grey(2),red(2),nR)', linspace(grey(3),red(3),nR)'];
+
+    cmap = [part1; part2; part3];
 end
-
-for i = 1:N
-    features.mean_beg_v(i)    = mean(features.beg_v(i,:), 2);
-    features.std_beg_v(i)     = std(features.beg_v(i,:), 0, 2);
-    features.mean_end_v(i)    = mean(features.end_v(i,:), 2);
-    features.std_end_v(i)     = std(features.end_v(i,:), 0, 2);
-    features.mean_beg_v_rel(i)= mean(features.beg_v_rel(i,:), 2);
-    features.std_beg_v_rel(i) = std(features.beg_v_rel(i,:), 0, 2);
-    features.mean_end_v_rel(i)= mean(features.end_v_rel(i,:), 2);
-    features.std_end_v_rel(i) = std(features.end_v_rel(i,:), 0, 2);
-    features.mean_peak_val(i) = mean(features.peak_val(i,:), 2);
-    features.std_peak_val(i)  = std(features.peak_val(i,:), 0, 2);
-    features.mean_valley_val(i)= mean(1./features.peak_val(i,:), 2);
-    features.std_valley_val(i) = std(1./features.peak_val(i,:), 0, 2);
-    features.min_valley_val(i) = min(1./features.peak_val(i,:));
-    features.max_valley_val(i) = max(1./features.peak_val(i,:));
-    features.mean_peak_v(i)   = mean(voltage_interp(features.idx_peak(i,:)), 2);
-    features.std_peak_v(i)    = std(voltage_interp(features.idx_peak(i,:)), 0, 2);
-    features.min_peak_v(i)    = min(voltage_interp(features.idx_peak(i,:)));
-    features.max_peak_v(i)    = max(voltage_interp(features.idx_peak(i,:)));
-end
-
-tick_indices      = round(linspace(1, N, 5));
-str_date          = datestr(t_datetime(tick_indices));
-str_date          = str_date(:,1:11);
-str_date_combined = [str_date(:,4:6), str_date(:,3), str_date(:,10:11)];
-features.str_date_combined = str_date_combined;
-
-%% Plot zoomed peak
-
-figure; hold on
-for i = 1:N
-    plot(voltage_interp, 1./Impedance_inter{i}(:,1)/1000, 'Color', colors(i,:))
-end
-xlabel('Voltage'); ylabel('1/Z_1 [k\Omega^{-1}]')
-grid off
-
-figure; hold on
-for i = 1:N
-    plot(voltage_interp, 1./Impedance_inter{i}(:,108)/1000, 'Color', colors(i,:))
-end
-xlabel('Voltage'); ylabel('1/Z_{108} [k\Omega^{-1}]')
-grid off
-
-%% Plot Results
-
-Plot_Impedance_Results_Date_paper(features,colors,font_size)
